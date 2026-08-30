@@ -1,6 +1,11 @@
 import React from 'react';
-import { AppNavigator } from './src/navigation/AppNavigator';
+import { LoginScreen } from './src/screens/LoginScreen';
 
 export default function App() {
-  return <AppNavigator />;
+  // Mock simple de navegación para pruebas en Web
+  const mockNavigation: any = {
+    replace: (screenName: string) => alert(`Redirigiendo a: ${screenName}`),
+  };
+
+  return <LoginScreen navigation={mockNavigation} route={{} as any} />;
 }
