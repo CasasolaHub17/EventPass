@@ -1,5 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  SafeAreaView,
+  Modal,
+  Image,
+} from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { AuthStackParamList, MainTabParamList } from '../types/navigation';
@@ -19,25 +29,35 @@ export const ProfileScreen = () => {
 
   const userEmail = route.params?.email || 'usuario@correo.com';
 
-  // Estado para gestionar los tickets de manera dinámica
+  // Estados para pases
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [processedIds, setProcessedIds] = useState<string[]>([]);
 
-  // Escuchar si viene un nuevo ticket desde el formulario de registro
+  // Estado para controlar el Modal del QR
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  // Escuchar si viene un nuevo ticket desde RegisterEventScreen
   useEffect(() => {
     const newTicket = (route.params as any)?.newTicket;
-    if (newTicket) {
-      setTickets((prevTickets) => {
-        // Evitamos duplicar si el ticket ya existe en la lista
-        const exists = prevTickets.some((item) => item.id === newTicket.id);
-        if (!exists) {
-          return [newTicket, ...prevTickets];
-        }
-        return prevTickets;
-      });
-    }
-  }, [route.params]);
 
-  // Función para cancelar/eliminar un registro de evento
+    if (newTicket && newTicket.id) {
+      const isAlreadyProcessed = processedIds.includes(newTicket.id);
+
+      if (!isAlreadyProcessed) {
+        setProcessedIds((prev) => [...prev, newTicket.id]);
+        setTickets((prev) => [newTicket, ...prev]);
+      }
+    }
+  }, [route.params?.newTicket]);
+
+  // Abrir Modal
+  const handleOpenQR = (ticket: Ticket) => {
+    setSelectedTicket(ticket);
+    setModalVisible(true);
+  };
+
+  // Cancelar Ticket
   const handleCancelTicket = (ticketId: string, ticketTitle: string) => {
     Alert.alert(
       'Cancelar Registro',
@@ -49,6 +69,9 @@ export const ProfileScreen = () => {
           style: 'destructive',
           onPress: () => {
             setTickets((prevTickets) => prevTickets.filter((item) => item.id !== ticketId));
+            if (selectedTicket?.id === ticketId) {
+              setModalVisible(false);
+            }
             Alert.alert('Registro Cancelado', 'Tu pase ha sido eliminado.');
           },
         },
@@ -112,16 +135,29 @@ export const ProfileScreen = () => {
           ) : (
             tickets.map((ticket) => (
               <View key={ticket.id} style={styles.ticketCard}>
-                <View style={styles.ticketInfo}>
+                {/* Zona de información clickeable */}
+                <TouchableOpacity
+                  style={styles.ticketInfo}
+                  onPress={() => handleOpenQR(ticket)}
+                  activeOpacity={0.6}
+                >
                   <Text style={styles.ticketTitle}>{ticket.title}</Text>
                   <Text style={styles.ticketDate}>{ticket.date}</Text>
-                </View>
+                  <Text style={styles.tapToView}>Toca aquí para ver pase</Text>
+                </TouchableOpacity>
 
+                {/* Acciones laterales */}
                 <View style={styles.ticketActions}>
-                  <View style={styles.qrBadge}>
-                    <Text style={styles.qrBadgeText}>QR Listo</Text>
-                  </View>
+                  {/* Botón QR Listo clickeable */}
+                  <TouchableOpacity
+                    style={styles.qrBadge}
+                    onPress={() => handleOpenQR(ticket)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.qrBadgeText}>QR Listo </Text>
+                  </TouchableOpacity>
 
+                  {/* Botón de Cancelación */}
                   <TouchableOpacity
                     style={styles.cancelButton}
                     onPress={() => handleCancelTicket(ticket.id, ticket.title)}
@@ -139,6 +175,44 @@ export const ProfileScreen = () => {
           <Text style={styles.logoutText}>Cerrar Sesión</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* MODAL DEL CÓDIGO QR */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalHeaderTitle}>Pase Digital de Entrada</Text>
+            <Text style={styles.modalEventTitle}>{selectedTicket?.title}</Text>
+            <Text style={styles.modalAttendee}>{getUserName(userEmail)}</Text>
+
+            {/* Código QR Dinámico */}
+            {selectedTicket && (
+              <View style={styles.qrContainer}>
+                <Image
+                  source={{
+                    uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=Ticket-${selectedTicket.id}`,
+                  }}
+                  style={styles.qrImage}
+                />
+              </View>
+            )}
+
+            <Text style={styles.ticketIdText}>ID: #{selectedTicket?.id.slice(-6)}</Text>
+            <Text style={styles.qrInstruction}>Muestra este código QR en la entrada del evento.</Text>
+
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>Cerrar Pase</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -227,6 +301,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderLeftWidth: 4,
     borderLeftColor: '#3182CE',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
   },
   ticketInfo: {
     flex: 1,
@@ -240,17 +318,26 @@ const styles = StyleSheet.create({
   ticketDate: {
     fontSize: 12,
     color: '#A0AEC0',
-    marginTop: 4,
+    marginTop: 2,
+  },
+  tapToView: {
+    fontSize: 11,
+    color: '#3182CE',
+    marginTop: 6,
+    fontWeight: '600',
   },
   ticketActions: {
     alignItems: 'flex-end',
+    justifyContent: 'space-between',
   },
   qrBadge: {
     backgroundColor: '#EBF8FF',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: 6,
-    marginBottom: 6,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#BEE3F8',
   },
   qrBadgeText: {
     color: '#2B6CB0',
@@ -298,6 +385,78 @@ const styles = StyleSheet.create({
   logoutText: {
     color: '#E53E3E',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+
+  /* MODAL ESTILOS */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 10,
+  },
+  modalHeaderTitle: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#A0AEC0',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  modalEventTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D3748',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  modalAttendee: {
+    fontSize: 14,
+    color: '#718096',
+    marginTop: 2,
+  },
+  qrContainer: {
+    marginVertical: 20,
+    padding: 12,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  qrImage: {
+    width: 180,
+    height: 180,
+  },
+  ticketIdText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#4A5568',
+  },
+  qrInstruction: {
+    fontSize: 12,
+    color: '#A0AEC0',
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 20,
+  },
+  closeModalButton: {
+    backgroundColor: '#3182CE',
+    width: '100%',
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  closeModalButtonText: {
+    color: '#FFF',
+    fontSize: 15,
     fontWeight: 'bold',
   },
 });
