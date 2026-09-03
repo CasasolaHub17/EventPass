@@ -21,8 +21,11 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    // Navega directamente al TabNavigator tras validar
-    navigation.replace('MainTabs');
+    // Navega al TabNavigator pasando el correo ingresado
+    navigation.replace('MainTabs', {
+      screen: 'Profile',
+      params: { email: email.toLowerCase() },
+    });
   };
 
   return (
