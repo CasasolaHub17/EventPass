@@ -1,17 +1,8 @@
-// src/context/ThemeContext.tsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { useColorScheme as useDeviceColorScheme } from 'react-native';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
-interface ThemeContextType {
-  theme: 'light' | 'dark';
-  themeMode: ThemeMode;
-  setThemeMode: (mode: ThemeMode) => void;
-  colors: typeof lightColors;
-}
-
-// Definición de colores centralizada
 export const lightColors = {
   background: '#F7FAFC',
   card: '#FFFFFF',
@@ -20,9 +11,7 @@ export const lightColors = {
   border: '#E2E8F0',
   primary: '#3182CE',
   primaryLight: '#EBF8FF',
-  primaryDark: '#2B6CB0',
   danger: '#E53E3E',
-  dangerLight: '#FFF5F5',
   modalOverlay: 'rgba(0, 0, 0, 0.6)',
   modalCard: '#FFFFFF',
 };
@@ -35,12 +24,17 @@ export const darkColors = {
   border: '#2D3748',
   primary: '#3182CE',
   primaryLight: '#1A365D',
-  primaryDark: '#63B3ED',
   danger: '#FC8181',
-  dangerLight: '#2D1F1F',
   modalOverlay: 'rgba(0, 0, 0, 0.8)',
   modalCard: '#1E1E1E',
 };
+
+interface ThemeContextType {
+  theme: 'light' | 'dark';
+  themeMode: ThemeMode;
+  setThemeMode: (mode: ThemeMode) => void;
+  colors: typeof lightColors;
+}
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
@@ -71,3 +65,6 @@ export const useTheme = () => {
   }
   return context;
 };
+
+// Doble exportación para evitar errores de importación
+export default ThemeProvider;

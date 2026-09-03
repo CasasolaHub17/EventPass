@@ -1,15 +1,11 @@
-// App.tsx
 import React from 'react';
-import { ThemeProvider } from './src/context/ThemeContext'; // Ajusta la ruta según tu estructura
-import { NavigationContainer } from '@react-navigation/native';
-import AppNavigator from './src/navigation/AppNavigator'; // Tu navegador principal
+import { ThemeProvider } from './src/context/ThemeContext';
+import AppNavigator from './src/navigation/AppNavigator';
 
 export default function App() {
   return (
     <ThemeProvider>
-      <NavigationContainer>
-        <AppNavigator />
-      </NavigationContainer>
+      <AppNavigator />
     </ThemeProvider>
   );
 }

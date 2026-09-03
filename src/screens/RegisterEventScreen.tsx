@@ -1,3 +1,4 @@
+// src/screens/RegisterEventScreen.tsx
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Alert, SafeAreaView, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -5,11 +6,13 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomInput } from '../components/CustomInput';
 import { CustomButton } from '../components/CustomButton';
 import { AuthStackParamList } from '../types/navigation';
+import { useTheme } from '../context/ThemeContext';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
 export const RegisterEventScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const { colors } = useTheme();
 
   const [attendeeName, setAttendeeName] = useState('');
   const [email, setEmail] = useState('');
@@ -27,11 +30,10 @@ export const RegisterEventScreen = () => {
       return;
     }
 
-    // Objeto con la información del nuevo pase
     const newTicket = {
       id: Date.now().toString(),
       title: eventName,
-      date: 'Fecha por confirmar', // O la fecha actual
+      date: 'Fecha por confirmar',
     };
 
     Alert.alert(
@@ -41,13 +43,11 @@ export const RegisterEventScreen = () => {
         {
           text: 'Ver mi pase en Perfil',
           onPress: () => {
-            // Limpiamos los campos
             setAttendeeName('');
             setEmail('');
             setPhone('');
             setEventName('');
 
-            // Redirigimos a Profile pasando el nuevo ticket y el correo
             navigation.navigate('MainTabs', {
               screen: 'Profile',
               params: {
@@ -62,10 +62,12 @@ export const RegisterEventScreen = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Registro a Evento</Text>
-        <Text style={styles.subtitle}>Ingresa los datos para obtener tu pase</Text>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Registro a Evento</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Ingresa los datos para obtener tu pase
+        </Text>
 
         <CustomInput
           label="Nombre del Asistente"
@@ -105,25 +107,23 @@ export const RegisterEventScreen = () => {
   );
 };
 
+export default RegisterEventScreen;
+
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F7FAFC',
   },
   container: {
     padding: 20,
-    backgroundColor: '#F7FAFC',
     flexGrow: 1,
   },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#2D3748',
     marginTop: 10,
   },
   subtitle: {
     fontSize: 14,
-    color: '#718096',
     marginBottom: 24,
     marginTop: 4,
   },

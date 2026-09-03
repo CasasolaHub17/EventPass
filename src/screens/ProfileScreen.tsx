@@ -1,3 +1,4 @@
+// src/screens/ProfileScreen.tsx
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -13,7 +14,7 @@ import {
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { AuthStackParamList, MainTabParamList } from '../types/navigation';
-import { useTheme } from '../context/ThemeContext'; // Importamos el Hook de tema
+import { useTheme } from '../context/ThemeContext';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 type ProfileRouteProp = RouteProp<MainTabParamList, 'Profile'>;
@@ -27,9 +28,10 @@ interface Ticket {
 export const ProfileScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<ProfileRouteProp>();
-  const { colors, themeMode, setThemeMode } = useTheme(); // Obtenemos colores y función de cambio
+  const { colors, themeMode, setThemeMode } = useTheme();
 
   const userEmail = route.params?.email || 'usuario@correo.com';
+  const isDark = themeMode === 'dark';
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [processedIds, setProcessedIds] = useState<string[]>([]);
@@ -93,7 +95,7 @@ export const ProfileScreen = () => {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
         
-        {/* Encabezado del Perfil */}
+        {/* Header */}
         <View style={styles.header}>
           <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
             <Text style={styles.avatarText}>{getAvatarInitials(userEmail)}</Text>
@@ -101,16 +103,6 @@ export const ProfileScreen = () => {
           <Text style={[styles.name, { color: colors.text }]}>{getUserName(userEmail)}</Text>
           <Text style={[styles.email, { color: colors.textSecondary }]}>{userEmail}</Text>
         </View>
-
-        {/* Botón para cambiar Tema de prueba */}
-        <TouchableOpacity
-          style={[styles.themeToggleButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => setThemeMode(themeMode === 'dark' ? 'light' : 'dark')}
-        >
-          <Text style={{ color: colors.text, fontWeight: '600' }}>
-            Cambiar Tema (Actual: {themeMode.toUpperCase()})
-          </Text>
-        </TouchableOpacity>
 
         {/* Estadísticas */}
         <View style={styles.statsContainer}>
@@ -132,7 +124,7 @@ export const ProfileScreen = () => {
             <View style={[styles.emptyContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.emptyText, { color: colors.text }]}>Aún no te has registrado a ningún evento.</Text>
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                Ve a la pestaña "Register" para añadir tu primera entrada.
+                Ve a la pestaña "Registrar" para añadir tu primera entrada.
               </Text>
             </View>
           ) : (
@@ -165,6 +157,26 @@ export const ProfileScreen = () => {
           <Text style={[styles.logoutText, { color: colors.danger }]}>Cerrar Sesión</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Botón Flotante con Diseño Tipo Píldora */}
+      <TouchableOpacity
+        style={[
+          styles.pillButton,
+          {
+            backgroundColor: isDark ? '#1E232A' : '#E6E9EF',
+            borderColor: isDark ? '#2A303C' : '#D2D7E0',
+          },
+        ]}
+        onPress={() => setThemeMode(isDark ? 'light' : 'dark')}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.pillIconBadge, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
+          <Text style={styles.pillIcon}>{isDark ? '🌙' : '☀️'}</Text>
+        </View>
+        <Text style={[styles.pillText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
+          {isDark ? 'MODO OSCURO' : 'MODO CLARO'}
+        </Text>
+      </TouchableOpacity>
 
       {/* Modal QR */}
       <Modal animationType="fade" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
@@ -199,14 +211,13 @@ export const ProfileScreen = () => {
 export default ProfileScreen;
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  container: { padding: 20, flexGrow: 1 },
+  safeArea: { flex: 1, position: 'relative' },
+  container: { padding: 20, paddingBottom: 90, flexGrow: 1 },
   header: { alignItems: 'center', marginVertical: 15 },
   avatar: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   avatarText: { color: '#FFF', fontSize: 28, fontWeight: 'bold' },
   name: { fontSize: 22, fontWeight: 'bold' },
   email: { fontSize: 14, marginTop: 2 },
-  themeToggleButton: { padding: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', marginVertical: 10 },
   statsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 12 },
   statCard: { flex: 0.48, padding: 16, borderRadius: 12, alignItems: 'center', elevation: 2 },
   statNumber: { fontSize: 24, fontWeight: 'bold' },
@@ -227,6 +238,44 @@ const styles = StyleSheet.create({
   emptySubtext: { fontSize: 12, marginTop: 4, textAlign: 'center' },
   logoutButton: { borderWidth: 1, paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: 10 },
   logoutText: { fontSize: 16, fontWeight: 'bold' },
+
+  /* Estilo del Botón Flotante Píldora */
+  pillButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    height: 46,
+    paddingHorizontal: 6,
+    paddingRight: 14,
+    borderRadius: 23,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    zIndex: 999,
+  },
+  pillIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 2,
+  },
+  pillIcon: {
+    fontSize: 16,
+  },
+  pillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginLeft: 10,
+  },
+
   modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { width: '100%', borderRadius: 16, padding: 24, alignItems: 'center', elevation: 10 },
   modalHeaderTitle: { fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 },
