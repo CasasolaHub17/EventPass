@@ -1,10 +1,10 @@
 export type AuthStackParamList = {
   Login: undefined;
-  MainTabs: undefined;
+  MainTabs: { email?: string };
 };
 
 export type MainTabParamList = {
-  Eventos: undefined;
-  Registro: undefined;
-  Perfil: undefined;
+  Home: undefined;
+  Register: undefined;
+  Profile: { email?: string };
 };
