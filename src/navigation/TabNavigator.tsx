@@ -7,12 +7,16 @@ import { MainTabParamList } from '../types/navigation';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-export const TabNavigator = () => {
+export const TabNavigator = ({ route }: any) => {
   return (
-    <Tab.Navigator screenOptions={{ headerShown: true }}>
-      <Tab.Screen name="Eventos" component={HomeScreen} />
-      <Tab.Screen name="Registro" component={RegisterEventScreen} />
-      <Tab.Screen name="Perfil" component={ProfileScreen} />
+    <Tab.Navigator screenOptions={{ headerShown: false }}>
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Register" component={RegisterEventScreen} />
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileScreen} 
+        initialParams={route?.params?.params} 
+      />
     </Tab.Navigator>
   );
 };

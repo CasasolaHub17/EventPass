@@ -1,79 +1,134 @@
 import React, { useState } from 'react';
-import { Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, SafeAreaView, ScrollView } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CustomInput } from '../components/CustomInput';
 import { CustomButton } from '../components/CustomButton';
+import { AuthStackParamList } from '../types/navigation';
+
+type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
 export const RegisterEventScreen = () => {
-  const [name, setName] = useState('');
+  const navigation = useNavigation<NavigationProp>();
+
+  const [attendeeName, setAttendeeName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [eventName, setEventName] = useState('');
 
-  const validate = () => {
-    let valid = true;
-    let newErrors: { [key: string]: string } = {};
-
-    if (!name.trim()) {
-      newErrors.name = 'El nombre es obligatorio';
-      valid = false;
-    }
-    if (!email.includes('@') || !email.includes('.')) {
-      newErrors.email = 'Ingrese un correo electrónico válido';
-      valid = false;
-    }
-    if (phone.length < 8) {
-      newErrors.phone = 'Ingrese un teléfono válido (mín. 8 dígitos)';
-      valid = false;
+  const handleRegister = () => {
+    if (!attendeeName || !email || !phone || !eventName) {
+      Alert.alert('Error', 'Por favor completa todos los campos.');
+      return;
     }
 
-    setErrors(newErrors);
-    return valid;
-  };
-
-  const handleSubmit = () => {
-    if (validate()) {
-      Alert.alert('¡Éxito!', 'Registro completado con éxito');
-      setName('');
-      setEmail('');
-      setPhone('');
-      setErrors({});
+    if (!email.includes('@')) {
+      Alert.alert('Error', 'Ingresa un correo electrónico válido.');
+      return;
     }
+
+    // Objeto con la información del nuevo pase
+    const newTicket = {
+      id: Date.now().toString(),
+      title: eventName,
+      date: 'Fecha por confirmar', // O la fecha actual
+    };
+
+    Alert.alert(
+      '¡Registro Exitoso!',
+      `Te has registrado a: ${eventName}`,
+      [
+        {
+          text: 'Ver mi pase en Perfil',
+          onPress: () => {
+            // Limpiamos los campos
+            setAttendeeName('');
+            setEmail('');
+            setPhone('');
+            setEventName('');
+
+            // Redirigimos a Profile pasando el nuevo ticket y el correo
+            navigation.navigate('MainTabs', {
+              screen: 'Profile',
+              params: {
+                email: email.toLowerCase(),
+                newTicket: newTicket,
+              },
+            });
+          },
+        },
+      ]
+    );
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Inscripción a Evento</Text>
-      
-      <CustomInput
-        label="Nombre Completo"
-        placeholder="Juan Pérez"
-        value={name}
-        onChangeText={setName}
-        error={errors.name}
-      />
-      <CustomInput
-        label="Correo Electrónico"
-        placeholder="juan@ejemplo.com"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        error={errors.email}
-      />
-      <CustomInput
-        label="Teléfono"
-        placeholder="99998888"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-        error={errors.phone}
-      />
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.title}>Registro a Evento</Text>
+        <Text style={styles.subtitle}>Ingresa los datos para obtener tu pase</Text>
 
-      <CustomButton title="Confirmar Registro" onPress={handleSubmit} />
-    </ScrollView>
+        <CustomInput
+          label="Nombre del Asistente"
+          placeholder="Tu nombre completo"
+          value={attendeeName}
+          onChangeText={setAttendeeName}
+        />
+
+        <CustomInput
+          label="Correo Electrónico"
+          placeholder="ejemplo@correo.com"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+        />
+
+        <CustomInput
+          label="Número de Teléfono"
+          placeholder="9999-9999"
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+        />
+
+        <CustomInput
+          label="Nombre del Evento"
+          placeholder="Ej. Conferencia Tech 2026"
+          value={eventName}
+          onChangeText={setEventName}
+        />
+
+        <View style={styles.buttonContainer}>
+          <CustomButton title="Confirmar Registro" onPress={handleRegister} />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 20, backgroundColor: '#FFF', flexGrow: 1 },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F7FAFC',
+  },
+  container: {
+    padding: 20,
+    backgroundColor: '#F7FAFC',
+    flexGrow: 1,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#2D3748',
+    marginTop: 10,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#718096',
+    marginBottom: 24,
+    marginTop: 4,
+  },
+  buttonContainer: {
+    marginTop: 16,
+    marginBottom: 20,
+  },
 });

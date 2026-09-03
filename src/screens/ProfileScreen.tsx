@@ -1,86 +1,153 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
-import { AuthStackParamList } from '../types/navigation';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { AuthStackParamList, MainTabParamList } from '../types/navigation';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
+type ProfileRouteProp = RouteProp<MainTabParamList, 'Profile'>;
+
+interface Ticket {
+  id: string;
+  title: string;
+  date: string;
+}
 
 export const ProfileScreen = () => {
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<ProfileRouteProp>();
 
-  const handleLogout = () => {
+  const userEmail = route.params?.email || 'usuario@correo.com';
+
+  // Estado para gestionar los tickets de manera dinámica
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+
+  // Escuchar si viene un nuevo ticket desde el formulario de registro
+  useEffect(() => {
+    const newTicket = (route.params as any)?.newTicket;
+    if (newTicket) {
+      setTickets((prevTickets) => {
+        // Evitamos duplicar si el ticket ya existe en la lista
+        const exists = prevTickets.some((item) => item.id === newTicket.id);
+        if (!exists) {
+          return [newTicket, ...prevTickets];
+        }
+        return prevTickets;
+      });
+    }
+  }, [route.params]);
+
+  // Función para cancelar/eliminar un registro de evento
+  const handleCancelTicket = (ticketId: string, ticketTitle: string) => {
     Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro de que deseas salir?',
+      'Cancelar Registro',
+      `¿Estás seguro de que deseas cancelar tu registro a "${ticketTitle}"?`,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: 'No, conservar', style: 'cancel' },
         {
-          text: 'Salir',
+          text: 'Sí, cancelar',
           style: 'destructive',
-          onPress: () => navigation.replace('Login'),
+          onPress: () => {
+            setTickets((prevTickets) => prevTickets.filter((item) => item.id !== ticketId));
+            Alert.alert('Registro Cancelado', 'Tu pase ha sido eliminado.');
+          },
         },
       ]
     );
   };
 
+  const getAvatarInitials = (email: string) => {
+    const namePart = email.split('@')[0];
+    if (!namePart) return 'U';
+    return namePart.slice(0, 2).toUpperCase();
+  };
+
+  const getUserName = (email: string) => {
+    const namePart = email.split('@')[0];
+    return namePart
+      .replace(/[._-]/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Cerrar Sesión', '¿Estás seguro de que deseas salir?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Salir', style: 'destructive', onPress: () => navigation.replace('Login') },
+    ]);
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Encabezado del Perfil */}
-      <View style={styles.header}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>UP</Text>
-        </View>
-        <Text style={styles.name}>Usuario de Pruebas</Text>
-        <Text style={styles.email}>usuario@correo.com</Text>
-      </View>
-
-      {/* Tarjetas de Estadísticas */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>3</Text>
-          <Text style={styles.statLabel}>Eventos</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={styles.statNumber}>2</Text>
-          <Text style={styles.statLabel}>Pases Activos</Text>
-        </View>
-      </View>
-
-      {/* Mis Entradas / Pases */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Mis Entradas Próximas</Text>
-        
-        <View style={styles.ticketCard}>
-          <View>
-            <Text style={styles.ticketTitle}>Conferencia Tech 2026</Text>
-            <Text style={styles.ticketDate}>15 de Septiembre • 10:00 AM</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Encabezado del Perfil */}
+        <View style={styles.header}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{getAvatarInitials(userEmail)}</Text>
           </View>
-          <View style={styles.qrBadge}>
-            <Text style={styles.qrBadgeText}>QR Listo</Text>
+          <Text style={styles.name}>{getUserName(userEmail)}</Text>
+          <Text style={styles.email}>{userEmail}</Text>
+        </View>
+
+        {/* Tarjetas de Estadísticas */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{tickets.length}</Text>
+            <Text style={styles.statLabel}>Eventos Registrados</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{tickets.length}</Text>
+            <Text style={styles.statLabel}>Pases Activos</Text>
           </View>
         </View>
 
-        <View style={styles.ticketCard}>
-          <View>
-            <Text style={styles.ticketTitle}>Hackathon Estudiantil</Text>
-            <Text style={styles.ticketDate}>05 de Octubre • 08:30 AM</Text>
-          </View>
-          <View style={styles.qrBadge}>
-            <Text style={styles.qrBadgeText}>QR Listo</Text>
-          </View>
-        </View>
-      </View>
+        {/* Mis Entradas / Pases */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Mis Entradas Próximas</Text>
 
-      {/* Botón de Logout */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Text style={styles.logoutText}>Cerrar Sesión</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          {tickets.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Aún no te has registrado a ningún evento.</Text>
+              <Text style={styles.emptySubtext}>Ve a la pestaña "Register" para añadir tu primera entrada.</Text>
+            </View>
+          ) : (
+            tickets.map((ticket) => (
+              <View key={ticket.id} style={styles.ticketCard}>
+                <View style={styles.ticketInfo}>
+                  <Text style={styles.ticketTitle}>{ticket.title}</Text>
+                  <Text style={styles.ticketDate}>{ticket.date}</Text>
+                </View>
+
+                <View style={styles.ticketActions}>
+                  <View style={styles.qrBadge}>
+                    <Text style={styles.qrBadgeText}>QR Listo</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => handleCancelTicket(ticket.id, ticket.title)}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancelar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+
+        {/* Botón de Logout */}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutText}>Cerrar Sesión</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F7FAFC',
+  },
   container: {
     padding: 20,
     backgroundColor: '#F7FAFC',
@@ -161,6 +228,10 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#3182CE',
   },
+  ticketInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
   ticketTitle: {
     fontSize: 15,
     fontWeight: '600',
@@ -171,16 +242,49 @@ const styles = StyleSheet.create({
     color: '#A0AEC0',
     marginTop: 4,
   },
+  ticketActions: {
+    alignItems: 'flex-end',
+  },
   qrBadge: {
     backgroundColor: '#EBF8FF',
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 6,
+    marginBottom: 6,
   },
   qrBadgeText: {
     color: '#2B6CB0',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
+  },
+  cancelButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  cancelButtonText: {
+    color: '#E53E3E',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    backgroundColor: '#FFF',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+  },
+  emptyText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4A5568',
+  },
+  emptySubtext: {
+    fontSize: 12,
+    color: '#A0AEC0',
+    marginTop: 4,
+    textAlign: 'center',
   },
   logoutButton: {
     backgroundColor: '#FFF',
