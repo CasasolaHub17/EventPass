@@ -15,58 +15,25 @@ import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../types/navigation';
 import { useTheme } from '../context/ThemeContext';
 import { useTickets } from '../context/TicketContext';
+import { useEvents, EventItem } from '../context/EventContext';
 
 type NavigationProp = BottomTabNavigationProp<MainTabParamList, 'Home'>;
-
-const MOCK_EVENTS = [
-  {
-    id: 'evt-101',
-    title: 'Tech Summit 2026',
-    date: '2026-10-15',
-    displayDate: '15 de Octubre, 2026',
-    location: 'Centro de Convenciones',
-    category: 'Tecnología',
-  },
-  {
-    id: 'evt-102',
-    title: 'Festival de Música Pop',
-    date: '2026-11-20',
-    displayDate: '20 de Noviembre, 2026',
-    location: 'Estadio Nacional',
-    category: 'Música',
-  },
-  {
-    id: 'evt-103',
-    title: 'Expo Gastronomía & Vino',
-    date: '2026-12-05',
-    displayDate: '05 de Diciembre, 2026',
-    location: 'Parque Central',
-    category: 'Comida',
-  },
-  {
-    id: 'evt-104',
-    title: 'Maratón Nocturna 10K',
-    date: '2026-12-12',
-    displayDate: '12 de Diciembre, 2026',
-    location: 'Avenida Principal',
-    category: 'Deportes',
-  },
-];
 
 export const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { colors } = useTheme();
   const { tickets, addTicket } = useTickets();
+  const { events } = useEvents();
 
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredEvents = useMemo(() => {
-    return MOCK_EVENTS.filter(
+    return events.filter(
       (evt) =>
         evt.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         evt.category.toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
+  }, [searchQuery, events]);
 
   const isUserRegistered = (eventId: string, eventTitle: string) => {
     return tickets.some(
@@ -74,7 +41,7 @@ export const HomeScreen = () => {
     );
   };
 
-  const handleRegister = (event: typeof MOCK_EVENTS[0]) => {
+  const handleRegister = (event: EventItem) => {
     if (isUserRegistered(event.id, event.title)) {
       Alert.alert('Registro Duplicado', 'Ya posees un pase activo para este evento.');
       return;
@@ -100,7 +67,7 @@ export const HomeScreen = () => {
     );
   };
 
-  const renderEventItem = ({ item }: { item: typeof MOCK_EVENTS[0] }) => {
+  const renderEventItem = ({ item }: { item: EventItem }) => {
     const registered = isUserRegistered(item.id, item.title);
 
     return (
