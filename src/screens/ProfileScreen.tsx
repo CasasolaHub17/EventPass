@@ -1,5 +1,5 @@
 // src/screens/ProfileScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   Modal,
   Image,
+  TextInput,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -20,6 +21,8 @@ import { useTickets, Ticket, TicketStatus } from '../context/TicketContext';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 type ProfileRouteProp = RouteProp<MainTabParamList, 'Profile'>;
+
+type FilterType = 'all' | 'upcoming' | 'ongoing' | 'finished' | 'cancelled';
 
 export const ProfileScreen = () => {
   const navigation = useNavigation<NavigationProp>();
@@ -32,6 +35,23 @@ export const ProfileScreen = () => {
 
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+
+  // Búsqueda y Filtros
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+
+  const filteredTickets = useMemo(() => {
+    return tickets.filter((ticket) => {
+      const status = getTicketStatus(ticket.date, ticket.isCancelled);
+      const matchesSearch = ticket.title
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase());
+      const matchesFilter =
+        activeFilter === 'all' ? true : status === activeFilter;
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [tickets, searchQuery, activeFilter]);
 
   const handleOpenQR = (ticket: Ticket, status: TicketStatus) => {
     if (status === 'cancelled') {
@@ -106,17 +126,48 @@ export const ProfileScreen = () => {
     ]);
   };
 
-  // Botón rojo que se desliza desde la derecha
-  const renderRightActions = (ticket: Ticket) => {
+  // Renderizado dinámico de opciones según el Estado del Evento
+  const renderRightActions = (ticket: Ticket, status: TicketStatus) => {
+    // Si el evento está EN CURSO, no permite ninguna acción
+    if (status === 'ongoing') {
+      return null;
+    }
+
+    const isUpcoming = status === 'upcoming';
+
     return (
-      <TouchableOpacity
-        style={styles.deleteSwipeAction}
-        onPress={() => handleDeleteTicket(ticket.id, ticket.title)}
-      >
-        <Text style={styles.deleteSwipeText}>🗑️ Eliminar</Text>
-      </TouchableOpacity>
+      <View style={styles.swipeActionsContainer}>
+        {/* Si está PRÓXIMO, muestra Cancelar */}
+        {isUpcoming && (
+          <TouchableOpacity
+            style={styles.cancelSwipeAction}
+            onPress={() => handleCancelTicket(ticket.id, ticket.title)}
+          >
+            <Text style={styles.swipeActionText}>🟡 Cancelar</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Eliminar (Disponible en Próximos, Cancelados y Finalizados) */}
+        <TouchableOpacity
+          style={[
+            styles.deleteSwipeAction,
+            !isUpcoming && styles.deleteSwipeActionSingle, // Bordes redondeados completos si es la única opción
+          ]}
+          onPress={() => handleDeleteTicket(ticket.id, ticket.title)}
+        >
+          <Text style={styles.swipeActionText}>🗑️ Eliminar</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
+
+  const filterOptions: { id: FilterType; label: string }[] = [
+    { id: 'all', label: 'Todos' },
+    { id: 'upcoming', label: 'Próximos' },
+    { id: 'ongoing', label: 'En Curso' },
+    { id: 'finished', label: 'Finalizados' },
+    { id: 'cancelled', label: 'Cancelados' },
+  ];
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -150,23 +201,73 @@ export const ProfileScreen = () => {
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>Mis Entradas</Text>
             <Text style={[styles.swipeHint, { color: colors.textSecondary }]}>
-              Desliza ⬅️ para eliminar
+              Desliza ⬅️ para opciones
             </Text>
           </View>
 
-          {tickets.length === 0 ? (
+          {/* Buscador */}
+          <View style={[styles.searchContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Buscar evento por nombre..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery !== '' && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Text style={[styles.clearSearch, { color: colors.textSecondary }]}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Chips de Filtros */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScrollView}>
+            {filterOptions.map((filter) => {
+              const isActive = activeFilter === filter.id;
+              return (
+                <TouchableOpacity
+                  key={filter.id}
+                  style={[
+                    styles.filterChip,
+                    {
+                      backgroundColor: isActive ? colors.primary : colors.card,
+                      borderColor: isActive ? colors.primary : colors.border,
+                    },
+                  ]}
+                  onPress={() => setActiveFilter(filter.id)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: isActive ? '#FFF' : colors.textSecondary },
+                    ]}
+                  >
+                    {filter.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Lista de Eventos */}
+          {filteredTickets.length === 0 ? (
             <View style={[styles.emptyContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.emptyText, { color: colors.text }]}>Aún no tienes ninguna entrada.</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                No se encontraron eventos.
+              </Text>
             </View>
           ) : (
-            tickets.map((ticket) => {
+            filteredTickets.map((ticket) => {
               const status = getTicketStatus(ticket.date, ticket.isCancelled);
               const badge = getStatusBadgeConfig(status);
 
               return (
                 <Swipeable
                   key={ticket.id}
-                  renderRightActions={() => renderRightActions(ticket)}
+                  renderRightActions={() => renderRightActions(ticket, status)}
+                  enabled={status !== 'ongoing'} // Desactiva la animación swipe si está en curso
                   overshootRight={false}
                 >
                   <View
@@ -191,14 +292,6 @@ export const ProfileScreen = () => {
                           {badge.label}
                         </Text>
                       </View>
-
-                      {status !== 'cancelled' && status !== 'finished' && (
-                        <TouchableOpacity onPress={() => handleCancelTicket(ticket.id, ticket.title)}>
-                          <Text style={[styles.cancelButtonText, { color: colors.danger }]}>
-                            Cancelar
-                          </Text>
-                        </TouchableOpacity>
-                      )}
                     </View>
                   </View>
                 </Swipeable>
@@ -280,35 +373,58 @@ const styles = StyleSheet.create({
   statNumber: { fontSize: 24, fontWeight: 'bold' },
   statLabel: { fontSize: 12, marginTop: 4 },
   section: { marginTop: 10, marginBottom: 20 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold' },
   swipeHint: { fontSize: 11, fontStyle: 'italic' },
+  
+  searchContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, height: 42, marginBottom: 12 },
+  searchIcon: { fontSize: 14, marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 14 },
+  clearSearch: { fontSize: 14, paddingHorizontal: 6, fontWeight: 'bold' },
+  filterScrollView: { marginBottom: 14, flexDirection: 'row' },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginRight: 8 },
+  filterChipText: { fontSize: 12, fontWeight: '600' },
+
   ticketCard: { padding: 16, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderLeftWidth: 4, elevation: 2 },
   ticketInfo: { flex: 1, marginRight: 10 },
   ticketTitle: { fontSize: 15, fontWeight: '600' },
   ticketDate: { fontSize: 12, marginTop: 4 },
-  ticketActions: { alignItems: 'flex-end', justifyContent: 'space-between' },
-  statusBadge: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, marginBottom: 8 },
+  ticketActions: { alignItems: 'flex-end', justifyContent: 'center' },
+  statusBadge: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
   statusBadgeText: { fontSize: 11, fontWeight: 'bold' },
-  cancelButtonText: { fontSize: 12, fontWeight: '600' },
-  
-  /* Estilo del panel de eliminación deslizable */
+
+  /* Acciones Swipe */
+  swipeActionsContainer: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  cancelSwipeAction: {
+    backgroundColor: '#9b04ff98',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 85,
+    borderTopLeftRadius: 10,
+    borderBottomLeftRadius: 10,
+  },
   deleteSwipeAction: {
     backgroundColor: '#EF4444',
     justifyContent: 'center',
     alignItems: 'center',
-    width: 90,
-    marginBottom: 10,
-    borderRadius: 10,
+    width: 85,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
   },
-  deleteSwipeText: {
+  deleteSwipeActionSingle: {
+    borderRadius: 10, // Bordes curvos completos cuando Eliminar es el único botón visible
+  },
+  swipeActionText: {
     color: '#FFF',
     fontWeight: 'bold',
-    fontSize: 12,
+    fontSize: 11,
   },
 
-  emptyContainer: { padding: 20, borderRadius: 10, alignItems: 'center' },
-  emptyText: { fontSize: 14, fontWeight: '600' },
+  emptyContainer: { padding: 25, borderRadius: 10, alignItems: 'center', marginTop: 5 },
+  emptyText: { fontSize: 14, fontWeight: '500' },
   logoutButton: { borderWidth: 1, paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: 10 },
   logoutText: { fontSize: 16, fontWeight: 'bold' },
   pillButton: { position: 'absolute', bottom: 20, right: 20, height: 46, paddingHorizontal: 6, paddingRight: 14, borderRadius: 23, flexDirection: 'row', alignItems: 'center', borderWidth: 1, elevation: 6, zIndex: 999 },
