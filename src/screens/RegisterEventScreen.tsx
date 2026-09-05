@@ -7,21 +7,24 @@ import { CustomInput } from '../components/CustomInput';
 import { CustomButton } from '../components/CustomButton';
 import { AuthStackParamList } from '../types/navigation';
 import { useTheme } from '../context/ThemeContext';
+import { useTickets } from '../context/TicketContext';
 
 type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
 
 export const RegisterEventScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { colors } = useTheme();
+  const { addTicket } = useTickets();
 
   const [attendeeName, setAttendeeName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [eventName, setEventName] = useState('');
+  const [eventDate, setEventDate] = useState(''); // Formato YYYY-MM-DD
 
   const handleRegister = () => {
-    if (!attendeeName || !email || !phone || !eventName) {
-      Alert.alert('Error', 'Por favor completa todos los campos.');
+    if (!attendeeName || !email || !phone || !eventName || !eventDate) {
+      Alert.alert('Error', 'Por favor completa todos los campos, incluida la fecha.');
       return;
     }
 
@@ -30,35 +33,39 @@ export const RegisterEventScreen = () => {
       return;
     }
 
-    const newTicket = {
-      id: Date.now().toString(),
+    // Validar formato de fecha YYYY-MM-DD simple
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(eventDate)) {
+      Alert.alert('Error', 'Ingresa la fecha en formato YYYY-MM-DD (ej: 2026-10-25).');
+      return;
+    }
+
+    // Agregar ticket al estado global
+    addTicket({
       title: eventName,
-      date: 'Fecha por confirmar',
-    };
+      date: eventDate,
+      attendeeName,
+      email: email.toLowerCase(),
+      phone,
+    });
 
-    Alert.alert(
-      '¡Registro Exitoso!',
-      `Te has registrado a: ${eventName}`,
-      [
-        {
-          text: 'Ver mi pase en Perfil',
-          onPress: () => {
-            setAttendeeName('');
-            setEmail('');
-            setPhone('');
-            setEventName('');
+    Alert.alert('¡Registro Exitoso!', `Te has registrado a: ${eventName}`, [
+      {
+        text: 'Ver mi pase en Perfil',
+        onPress: () => {
+          setAttendeeName('');
+          setEmail('');
+          setPhone('');
+          setEventName('');
+          setEventDate('');
 
-            navigation.navigate('MainTabs', {
-              screen: 'Profile',
-              params: {
-                email: email.toLowerCase(),
-                newTicket: newTicket,
-              },
-            });
-          },
+          navigation.navigate('MainTabs', {
+            screen: 'Profile',
+            params: { email: email.toLowerCase() },
+          });
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
@@ -99,6 +106,13 @@ export const RegisterEventScreen = () => {
           onChangeText={setEventName}
         />
 
+        <CustomInput
+          label="Fecha del Evento (YYYY-MM-DD)"
+          placeholder="2026-10-25"
+          value={eventDate}
+          onChangeText={setEventDate}
+        />
+
         <View style={styles.buttonContainer}>
           <CustomButton title="Confirmar Registro" onPress={handleRegister} />
         </View>
@@ -110,25 +124,9 @@ export const RegisterEventScreen = () => {
 export default RegisterEventScreen;
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  container: {
-    padding: 20,
-    flexGrow: 1,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginTop: 10,
-  },
-  subtitle: {
-    fontSize: 14,
-    marginBottom: 24,
-    marginTop: 4,
-  },
-  buttonContainer: {
-    marginTop: 16,
-    marginBottom: 20,
-  },
+  safeArea: { flex: 1 },
+  container: { padding: 20, flexGrow: 1 },
+  title: { fontSize: 22, fontWeight: 'bold', marginTop: 10 },
+  subtitle: { fontSize: 14, marginBottom: 24, marginTop: 4 },
+  buttonContainer: { marginTop: 16, marginBottom: 20 },
 });
