@@ -1,42 +1,183 @@
 // src/screens/HomeScreen.tsx
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  SafeAreaView,
+  Alert,
+} from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { MainTabParamList } from '../types/navigation';
 import { useTheme } from '../context/ThemeContext';
+import { useTickets } from '../context/TicketContext';
 
-const mockEvents = [
-  { id: '1', title: 'Conferencia Tech 2026', date: '15 de Septiembre', location: 'Auditorio Principal' },
-  { id: '2', title: 'Hackathon Estudiantil', date: '05 de Octubre', location: 'Laboratorio de Cómputo' },
-  { id: '3', title: 'Taller de React Native', date: '20 de Octubre', location: 'Aula Magna' },
+type NavigationProp = BottomTabNavigationProp<MainTabParamList, 'Home'>;
+
+const MOCK_EVENTS = [
+  {
+    id: 'evt-101',
+    title: 'Tech Summit 2026',
+    date: '2026-10-15',
+    displayDate: '15 de Octubre, 2026',
+    location: 'Centro de Convenciones',
+    category: 'Tecnología',
+  },
+  {
+    id: 'evt-102',
+    title: 'Festival de Música Pop',
+    date: '2026-11-20',
+    displayDate: '20 de Noviembre, 2026',
+    location: 'Estadio Nacional',
+    category: 'Música',
+  },
+  {
+    id: 'evt-103',
+    title: 'Expo Gastronomía & Vino',
+    date: '2026-12-05',
+    displayDate: '05 de Diciembre, 2026',
+    location: 'Parque Central',
+    category: 'Comida',
+  },
+  {
+    id: 'evt-104',
+    title: 'Maratón Nocturna 10K',
+    date: '2026-12-12',
+    displayDate: '12 de Diciembre, 2026',
+    location: 'Avenida Principal',
+    category: 'Deportes',
+  },
 ];
 
 export const HomeScreen = () => {
+  const navigation = useNavigation<NavigationProp>();
   const { colors } = useTheme();
+  const { tickets, addTicket } = useTickets();
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredEvents = useMemo(() => {
+    return MOCK_EVENTS.filter(
+      (evt) =>
+        evt.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        evt.category.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [searchQuery]);
+
+  const isUserRegistered = (eventId: string, eventTitle: string) => {
+    return tickets.some(
+      (t) => !t.isCancelled && (t.eventId === eventId || t.title.toLowerCase() === eventTitle.toLowerCase())
+    );
+  };
+
+  const handleRegister = (event: typeof MOCK_EVENTS[0]) => {
+    if (isUserRegistered(event.id, event.title)) {
+      Alert.alert('Registro Duplicado', 'Ya posees un pase activo para este evento.');
+      return;
+    }
+
+    addTicket({
+      eventId: event.id,
+      title: event.title,
+      date: event.date,
+      isCancelled: false,
+    });
+
+    Alert.alert(
+      '¡Registro Exitoso! 🎉',
+      `Te has inscrito a "${event.title}". Tu pase digital ya está disponible en tu perfil.`,
+      [
+        { text: 'Seguir explorando', style: 'cancel' },
+        {
+          text: 'Ver mi Pase',
+          onPress: () => navigation.navigate('Profile'),
+        },
+      ]
+    );
+  };
+
+  const renderEventItem = ({ item }: { item: typeof MOCK_EVENTS[0] }) => {
+    const registered = isUserRegistered(item.id, item.title);
+
+    return (
+      <View style={[styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.cardHeader}>
+          <Text style={[styles.categoryBadge, { color: colors.primary, backgroundColor: `${colors.primary}15` }]}>
+            {item.category}
+          </Text>
+          <Text style={[styles.eventDate, { color: colors.textSecondary }]}>
+            📅 {item.displayDate}
+          </Text>
+        </View>
+
+        <Text style={[styles.eventTitle, { color: colors.text }]}>{item.title}</Text>
+        <Text style={[styles.eventLocation, { color: colors.textSecondary }]}>
+          📍 {item.location}
+        </Text>
+
+        <TouchableOpacity
+          style={[
+            styles.registerButton,
+            { backgroundColor: registered ? '#22C55E20' : colors.primary },
+            registered && { borderWidth: 1, borderColor: '#22C55E' },
+          ]}
+          onPress={() => handleRegister(item)}
+          disabled={registered}
+        >
+          <Text
+            style={[
+              styles.registerButtonText,
+              { color: registered ? '#22C55E' : '#FFFFFF' },
+            ]}
+          >
+            {registered ? '✅ Registrado (1 Pase)' : '🎟️ Registrarme'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Eventos Disponibles</Text>
+      <View style={styles.container}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Descubrir Eventos</Text>
+        <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+          Explora e inscríbete a los próximos eventos
+        </Text>
+
+        <View style={[styles.searchContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Buscar por nombre o categoría..."
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery !== '' && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Text style={[styles.clearSearch, { color: colors.textSecondary }]}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         <FlatList
-          data={mockEvents}
+          data={filteredEvents}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                },
-              ]}
-            >
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
-              <Text style={[styles.cardDetail, { color: colors.textSecondary }]}>📅 {item.date}</Text>
-              <Text style={[styles.cardDetail, { color: colors.textSecondary }]}>📍 {item.location}</Text>
+          renderItem={renderEventItem}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                No se encontraron eventos para "{searchQuery}".
+              </Text>
             </View>
-          )}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          }
         />
       </View>
     </SafeAreaView>
@@ -46,34 +187,57 @@ export const HomeScreen = () => {
 export default HomeScreen;
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  container: {
-    flex: 1,
-    padding: 20,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  card: {
-    padding: 16,
+  safeArea: { flex: 1 },
+  container: { flex: 1, paddingHorizontal: 20, paddingTop: 15 },
+  headerTitle: { fontSize: 24, fontWeight: 'bold' },
+  headerSubtitle: { fontSize: 13, marginTop: 2, marginBottom: 15 },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
     borderRadius: 12,
-    marginBottom: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 15,
+  },
+  searchIcon: { fontSize: 14, marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 14 },
+  clearSearch: { fontSize: 14, paddingHorizontal: 6, fontWeight: 'bold' },
+  listContainer: { paddingBottom: 20 },
+  eventCard: {
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginBottom: 14,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
   },
-  cardTitle: {
-    fontSize: 16,
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  categoryBadge: {
+    fontSize: 11,
     fontWeight: 'bold',
-    marginBottom: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    overflow: 'hidden',
   },
-  cardDetail: {
-    fontSize: 13,
-    marginTop: 2,
+  eventDate: { fontSize: 12, fontWeight: '500' },
+  eventTitle: { fontSize: 17, fontWeight: 'bold', marginBottom: 4 },
+  eventLocation: { fontSize: 13, marginBottom: 14 },
+  registerButton: {
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  registerButtonText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  emptyContainer: { padding: 30, alignItems: 'center' },
+  emptyText: { fontSize: 14, textAlign: 'center' },
 });
