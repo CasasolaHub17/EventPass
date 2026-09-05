@@ -1,159 +1,165 @@
 // src/screens/ProfileScreen.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
-  Alert,
   SafeAreaView,
-  Modal,
-  Image,
   TextInput,
+  Alert,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
-import { AuthStackParamList, MainTabParamList } from '../types/navigation';
 import { useTheme } from '../context/ThemeContext';
-import { useTickets, Ticket, TicketStatus } from '../context/TicketContext';
+import { useTickets } from '../context/TicketContext';
 
-type NavigationProp = NativeStackNavigationProp<AuthStackParamList>;
-type ProfileRouteProp = RouteProp<MainTabParamList, 'Profile'>;
+// Helper para interpretar fechas en formatos DD-MM-YYYY y YYYY-MM-DD
+const parseEventDate = (dateString?: string): Date => {
+  if (!dateString) return new Date();
 
-type FilterType = 'all' | 'upcoming' | 'ongoing' | 'finished' | 'cancelled';
+  const cleanDate = dateString.trim().replace(/\//g, '-');
+  const parts = cleanDate.split('-');
 
-export const ProfileScreen = () => {
-  const navigation = useNavigation<NavigationProp>();
-  const route = useRoute<ProfileRouteProp>();
-  const { colors, themeMode, setThemeMode } = useTheme();
-  const { tickets, cancelTicket, deleteTicket, getTicketStatus } = useTickets();
+  if (parts.length === 3) {
+    const num1 = parseInt(parts[0], 10);
+    const num2 = parseInt(parts[1], 10);
+    const num3 = parseInt(parts[2], 10);
 
-  const userEmail = route.params?.email || 'usuario@correo.com';
-  const isDark = themeMode === 'dark';
-
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
-
-  // Búsqueda y Filtros
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
-
-  const filteredTickets = useMemo(() => {
-    return tickets.filter((ticket) => {
-      const status = getTicketStatus(ticket.date, ticket.isCancelled);
-      const matchesSearch = ticket.title
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-      const matchesFilter =
-        activeFilter === 'all' ? true : status === activeFilter;
-
-      return matchesSearch && matchesFilter;
-    });
-  }, [tickets, searchQuery, activeFilter]);
-
-  const handleOpenQR = (ticket: Ticket, status: TicketStatus) => {
-    if (status === 'cancelled') {
-      Alert.alert('Pase Cancelado', 'Este pase ya no es válido.');
-      return;
+    if (parts[0].length === 2 && parts[2].length === 4) {
+      return new Date(num3, num2 - 1, num1);
     }
-    setSelectedTicket(ticket);
-    setModalVisible(true);
-  };
 
-  const handleCancelTicket = (ticketId: string, ticketTitle: string) => {
+    if (parts[0].length === 4) {
+      return new Date(num1, num2 - 1, num3);
+    }
+  }
+
+  const parsed = new Date(dateString);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+};
+
+// Determina el estado dinámicamente
+const getEventStatus = (dateString?: string) => {
+  const eventDate = parseEventDate(dateString);
+  const today = new Date();
+
+  eventDate.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+
+  const eventTime = eventDate.getTime();
+  const todayTime = today.getTime();
+
+  if (eventTime > todayTime) {
+    return {
+      key: 'Próximos',
+      label: 'Próximo',
+      icon: '🟢',
+      color: '#15803D',
+      bgColor: '#DCFCE7',
+    };
+  } else if (eventTime === todayTime) {
+    return {
+      key: 'En Curso',
+      label: 'En Curso',
+      icon: '🟡',
+      color: '#A16207',
+      bgColor: '#FEF9C3',
+    };
+  } else {
+    return {
+      key: 'Finalizados',
+      label: 'Finalizado',
+      icon: '⚪',
+      color: '#4B5563',
+      bgColor: '#F3F4F6',
+    };
+  }
+};
+
+export const ProfileScreen = ({ navigation }: any) => {
+  const { colors, toggleTheme } = useTheme();
+  const { tickets, deleteTicket } = useTickets();
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState('Todos');
+
+  // Acción de Cancelar Pase (Eventos Próximos)
+  const handleCancelTicket = (ticketId: string, title: string) => {
     Alert.alert(
-      'Cancelar Registro',
-      `¿Estás seguro de que deseas cancelar tu registro a "${ticketTitle}"?`,
+      'Cancelar Pase',
+      `¿Deseas cancelar tu inscripción al evento "${title}"?`,
       [
-        { text: 'No, conservar', style: 'cancel' },
+        { text: 'Volver', style: 'cancel' },
         {
-          text: 'Sí, cancelar',
+          text: 'Sí, Cancelar',
           style: 'destructive',
           onPress: () => {
-            cancelTicket(ticketId);
-            if (selectedTicket?.id === ticketId) setModalVisible(false);
+            if (deleteTicket) {
+              deleteTicket(ticketId);
+            }
           },
         },
       ]
     );
   };
 
-  const handleDeleteTicket = (ticketId: string, ticketTitle: string) => {
+  // Acción de Eliminar Historial (Eventos Próximos o Finalizados)
+  const handleDeleteTicket = (ticketId: string, title: string) => {
     Alert.alert(
-      'Eliminar Pase',
-      `¿Deseas eliminar definitivamente "${ticketTitle}" de tu historial?`,
+      'Eliminar Registro',
+      `¿Deseas eliminar permanentemente el registro de "${title}"?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: () => deleteTicket(ticketId),
+          onPress: () => {
+            if (deleteTicket) {
+              deleteTicket(ticketId);
+            }
+          },
         },
       ]
     );
   };
 
-  const getStatusBadgeConfig = (status: TicketStatus) => {
-    switch (status) {
-      case 'upcoming':
-        return { label: '🟢 Próximo', bg: '#22C55E20', text: '#22C55E' };
-      case 'ongoing':
-        return { label: '🟡 En Curso', bg: '#EAB30820', text: '#EAB308' };
-      case 'cancelled':
-        return { label: '🔴 Cancelado', bg: '#EF444420', text: '#EF4444' };
-      case 'finished':
-      default:
-        return { label: '⚪ Finalizado', bg: '#6B728020', text: '#9CA3AF' };
-    }
-  };
-
-  const getAvatarInitials = (email: string) => {
-    const namePart = email.split('@')[0];
-    return namePart ? namePart.slice(0, 2).toUpperCase() : 'U';
-  };
-
-  const getUserName = (email: string) => {
-    const namePart = email.split('@')[0];
-    return namePart.replace(/[._-]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
-  };
-
-  const handleLogout = () => {
-    Alert.alert('Cerrar Sesión', '¿Estás seguro de que deseas salir?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Salir', style: 'destructive', onPress: () => navigation.replace('Login') },
-    ]);
-  };
-
-  // Renderizado dinámico de opciones según el Estado del Evento
-  const renderRightActions = (ticket: Ticket, status: TicketStatus) => {
-    // Si el evento está EN CURSO, no permite ninguna acción
-    if (status === 'ongoing') {
+  // Renderizar las acciones según el estado del evento
+  const renderRightActions = (ticketId: string, title: string, statusKey: string) => {
+    // 1. En Curso: Ninguna opción al deslizar
+    if (statusKey === 'En Curso') {
       return null;
     }
 
-    const isUpcoming = status === 'upcoming';
+    // 2. Próximos: Opciones de Cancelar y Eliminar
+    if (statusKey === 'Próximos') {
+      return (
+        <View style={styles.swipeActionsContainer}>
+          <TouchableOpacity
+            style={[styles.swipeActionBtn, styles.cancelActionBtn]}
+            onPress={() => handleCancelTicket(ticketId, title)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.swipeActionText}>🚫 Cancelar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.swipeActionBtn, styles.deleteActionBtn]}
+            onPress={() => handleDeleteTicket(ticketId, title)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.swipeActionText}>🗑️ Eliminar</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
 
+    // 3. Finalizados: Únicamente opción de Eliminar
     return (
       <View style={styles.swipeActionsContainer}>
-        {/* Si está PRÓXIMO, muestra Cancelar */}
-        {isUpcoming && (
-          <TouchableOpacity
-            style={styles.cancelSwipeAction}
-            onPress={() => handleCancelTicket(ticket.id, ticket.title)}
-          >
-            <Text style={styles.swipeActionText}>🟡 Cancelar</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Eliminar (Disponible en Próximos, Cancelados y Finalizados) */}
         <TouchableOpacity
-          style={[
-            styles.deleteSwipeAction,
-            !isUpcoming && styles.deleteSwipeActionSingle, // Bordes redondeados completos si es la única opción
-          ]}
-          onPress={() => handleDeleteTicket(ticket.id, ticket.title)}
+          style={[styles.swipeActionBtn, styles.deleteActionBtn]}
+          onPress={() => handleDeleteTicket(ticketId, title)}
+          activeOpacity={0.8}
         >
           <Text style={styles.swipeActionText}>🗑️ Eliminar</Text>
         </TouchableOpacity>
@@ -161,199 +167,170 @@ export const ProfileScreen = () => {
     );
   };
 
-  const filterOptions: { id: FilterType; label: string }[] = [
-    { id: 'all', label: 'Todos' },
-    { id: 'upcoming', label: 'Próximos' },
-    { id: 'ongoing', label: 'En Curso' },
-    { id: 'finished', label: 'Finalizados' },
-    { id: 'cancelled', label: 'Cancelados' },
-  ];
+  const filteredTickets = tickets.filter((ticket: any) => {
+    const rawDate = ticket.eventDate || ticket.date;
+    const status = getEventStatus(rawDate);
+    const title = ticket.eventTitle || ticket.title || '';
+    const matchesSearch = title.toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (selectedFilter === 'Todos') return matchesSearch;
+    return matchesSearch && status.key === selectedFilter;
+  });
+
+  const activeTicketsCount = tickets.filter((t: any) => {
+    const rawDate = t.eventDate || t.date;
+    return getEventStatus(rawDate).key !== 'Finalizados';
+  }).length;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
-        
-        {/* Header Usuario */}
-        <View style={styles.header}>
-          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={styles.avatarText}>{getAvatarInitials(userEmail)}</Text>
+      <View style={styles.container}>
+        {/* Cabecera del Usuario con Botón de Ajustes */}
+        <View style={styles.headerContainer}>
+          <View style={styles.userInfo}>
+            <Text style={[styles.userName, { color: colors.text }]}>Usuario</Text>
+            <Text style={[styles.userEmail, { color: colors.textSecondary }]}>
+              usuario@correo.com
+            </Text>
           </View>
-          <Text style={[styles.name, { color: colors.text }]}>{getUserName(userEmail)}</Text>
-          <Text style={[styles.email, { color: colors.textSecondary }]}>{userEmail}</Text>
+          <TouchableOpacity
+            style={[styles.settingsButton, { backgroundColor: colors.primary }]}
+            onPress={toggleTheme}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.settingsIcon}>⚙️</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Estadísticas */}
+        {/* Tarjetas de Estadísticas */}
         <View style={styles.statsContainer}>
-          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.statNumber, { color: colors.primary }]}>{tickets.length}</Text>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Pases</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.statNumber, { color: '#22C55E' }]}>
-              {tickets.filter((t) => getTicketStatus(t.date, t.isCancelled) !== 'cancelled' && getTicketStatus(t.date, t.isCancelled) !== 'finished').length}
-            </Text>
+          <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.statNumber, { color: '#16A34A' }]}>{activeTicketsCount}</Text>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Activos</Text>
           </View>
         </View>
 
-        {/* Mis Entradas */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Mis Entradas</Text>
-            <Text style={[styles.swipeHint, { color: colors.textSecondary }]}>
-              Desliza ⬅️ para opciones
-            </Text>
-          </View>
+        {/* Sección de Entradas y Buscador */}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Mis Entradas</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.textSecondary }]}>
+            Desliza ⬅️ para opciones
+          </Text>
+        </View>
 
-          {/* Buscador */}
-          <View style={[styles.searchContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Buscar evento por nombre..."
-              placeholderTextColor={colors.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery !== '' && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Text style={[styles.clearSearch, { color: colors.textSecondary }]}>✕</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+        <View style={[styles.searchContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Buscar evento por nombre..."
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
 
-          {/* Chips de Filtros */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScrollView}>
-            {filterOptions.map((filter) => {
-              const isActive = activeFilter === filter.id;
-              return (
-                <TouchableOpacity
-                  key={filter.id}
+        {/* Chips de Filtro */}
+        <View style={styles.filterContainer}>
+          {['Todos', 'Próximos', 'En Curso', 'Finalizados'].map((filter) => {
+            const isActive = selectedFilter === filter;
+            return (
+              <TouchableOpacity
+                key={filter}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: isActive ? colors.primary : colors.card,
+                    borderColor: isActive ? colors.primary : colors.border,
+                  },
+                ]}
+                onPress={() => setSelectedFilter(filter)}
+              >
+                <Text
                   style={[
-                    styles.filterChip,
-                    {
-                      backgroundColor: isActive ? colors.primary : colors.card,
-                      borderColor: isActive ? colors.primary : colors.border,
-                    },
+                    styles.filterText,
+                    { color: isActive ? '#FFFFFF' : colors.textSecondary },
                   ]}
-                  onPress={() => setActiveFilter(filter.id)}
                 >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      { color: isActive ? '#FFF' : colors.textSecondary },
-                    ]}
-                  >
-                    {filter.label}
+                  {filter}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Lista de Eventos con Swipeable según el Estado */}
+        <FlatList
+          data={filteredTickets}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }: any) => {
+            const rawDate = item.eventDate || item.date;
+            const status = getEventStatus(rawDate);
+            const title = item.eventTitle || item.title;
+
+            const cardContent = (
+              <View
+                style={[
+                  styles.ticketCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                    borderLeftColor: status.color,
+                  },
+                ]}
+              >
+                <View style={styles.ticketMainInfo}>
+                  <Text style={[styles.ticketTitle, { color: colors.text }]}>
+                    {title}
                   </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+                  <Text style={[styles.ticketDate, { color: colors.textSecondary }]}>
+                    📅 {rawDate}
+                  </Text>
+                </View>
 
-          {/* Lista de Eventos */}
-          {filteredTickets.length === 0 ? (
-            <View style={[styles.emptyContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                No se encontraron eventos.
-              </Text>
-            </View>
-          ) : (
-            filteredTickets.map((ticket) => {
-              const status = getTicketStatus(ticket.date, ticket.isCancelled);
-              const badge = getStatusBadgeConfig(status);
-
-              return (
-                <Swipeable
-                  key={ticket.id}
-                  renderRightActions={() => renderRightActions(ticket, status)}
-                  enabled={status !== 'ongoing'} // Desactiva la animación swipe si está en curso
-                  overshootRight={false}
-                >
-                  <View
-                    style={[
-                      styles.ticketCard,
-                      { backgroundColor: colors.card, borderLeftColor: badge.text },
-                    ]}
-                  >
-                    <TouchableOpacity
-                      style={styles.ticketInfo}
-                      onPress={() => handleOpenQR(ticket, status)}
-                    >
-                      <Text style={[styles.ticketTitle, { color: colors.text }]}>{ticket.title}</Text>
-                      <Text style={[styles.ticketDate, { color: colors.textSecondary }]}>
-                        📅 {ticket.date}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.ticketActions}>
-                      <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
-                        <Text style={[styles.statusBadgeText, { color: badge.text }]}>
-                          {badge.label}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </Swipeable>
-              );
-            })
-          )}
-        </View>
-
-        {/* Cerrar Sesión */}
-        <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: colors.card, borderColor: colors.danger }]}
-          onPress={handleLogout}
-        >
-          <Text style={[styles.logoutText, { color: colors.danger }]}>Cerrar Sesión</Text>
-        </TouchableOpacity>
-      </ScrollView>
-
-      {/* Botón Flotante Tema */}
-      <TouchableOpacity
-        style={[
-          styles.pillButton,
-          {
-            backgroundColor: isDark ? '#1E232A' : '#E6E9EF',
-            borderColor: isDark ? '#2A303C' : '#D2D7E0',
-          },
-        ]}
-        onPress={() => setThemeMode(isDark ? 'light' : 'dark')}
-        activeOpacity={0.8}
-      >
-        <View style={[styles.pillIconBadge, { backgroundColor: isDark ? '#2D3748' : '#FFFFFF' }]}>
-          <Text style={styles.pillIcon}>{isDark ? '🌙' : '☀️'}</Text>
-        </View>
-        <Text style={[styles.pillText, { color: isDark ? '#A0AEC0' : '#718096' }]}>
-          {isDark ? 'DARK MODE' : 'LIGHT MODE'}
-        </Text>
-      </TouchableOpacity>
-
-      {/* Modal QR */}
-      <Modal animationType="fade" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-        <View style={[styles.modalOverlay, { backgroundColor: colors.modalOverlay }]}>
-          <View style={[styles.modalContent, { backgroundColor: colors.modalCard }]}>
-            <Text style={[styles.modalHeaderTitle, { color: colors.textSecondary }]}>Pase Digital de Entrada</Text>
-            <Text style={[styles.modalEventTitle, { color: colors.text }]}>{selectedTicket?.title}</Text>
-            <Text style={[styles.modalAttendee, { color: colors.textSecondary }]}>{getUserName(userEmail)}</Text>
-
-            {selectedTicket && (
-              <View style={styles.qrContainer}>
-                <Image
-                  source={{ uri: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=Ticket-${selectedTicket.id}` }}
-                  style={styles.qrImage}
-                />
+                <View style={[styles.statusBadge, { backgroundColor: status.bgColor }]}>
+                  <Text style={styles.statusIcon}>{status.icon}</Text>
+                  <Text style={[styles.statusText, { color: status.color }]}>
+                    {status.label}
+                  </Text>
+                </View>
               </View>
-            )}
+            );
 
-            <Text style={[styles.ticketIdText, { color: colors.text }]}>ID: #{selectedTicket?.id.slice(-6)}</Text>
+            // Si es "En Curso", no permitimos el gesto Swipeable
+            if (status.key === 'En Curso') {
+              return cardContent;
+            }
 
-            <TouchableOpacity style={[styles.closeModalButton, { backgroundColor: colors.primary }]} onPress={() => setModalVisible(false)}>
-              <Text style={styles.closeModalButtonText}>Cerrar Pase</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+            return (
+              <Swipeable
+                renderRightActions={() => renderRightActions(item.id, title, status.key)}
+                overshootRight={false}
+              >
+                {cardContent}
+              </Swipeable>
+            );
+          }}
+          ListEmptyComponent={
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              No se encontraron entradas.
+            </Text>
+          }
+        />
+
+        {/* Botón Inferior de Cerrar Sesión */}
+        <TouchableOpacity
+          style={[styles.logoutButton, { borderColor: '#EF4444' }]}
+          onPress={() => navigation.replace('Login')}
+        >
+          <Text style={styles.logoutText}>Cerrar Sesión</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -361,84 +338,131 @@ export const ProfileScreen = () => {
 export default ProfileScreen;
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, position: 'relative' },
-  container: { padding: 20, paddingBottom: 90, flexGrow: 1 },
-  header: { alignItems: 'center', marginVertical: 15 },
-  avatar: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  avatarText: { color: '#FFF', fontSize: 28, fontWeight: 'bold' },
-  name: { fontSize: 22, fontWeight: 'bold' },
-  email: { fontSize: 14, marginTop: 2 },
-  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 12 },
-  statCard: { flex: 0.48, padding: 16, borderRadius: 12, alignItems: 'center', elevation: 2 },
-  statNumber: { fontSize: 24, fontWeight: 'bold' },
-  statLabel: { fontSize: 12, marginTop: 4 },
-  section: { marginTop: 10, marginBottom: 20 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold' },
-  swipeHint: { fontSize: 11, fontStyle: 'italic' },
-  
-  searchContainer: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, height: 42, marginBottom: 12 },
-  searchIcon: { fontSize: 14, marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 14 },
-  clearSearch: { fontSize: 14, paddingHorizontal: 6, fontWeight: 'bold' },
-  filterScrollView: { marginBottom: 14, flexDirection: 'row' },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginRight: 8 },
-  filterChipText: { fontSize: 12, fontWeight: '600' },
-
-  ticketCard: { padding: 16, borderRadius: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderLeftWidth: 4, elevation: 2 },
-  ticketInfo: { flex: 1, marginRight: 10 },
-  ticketTitle: { fontSize: 15, fontWeight: '600' },
-  ticketDate: { fontSize: 12, marginTop: 4 },
-  ticketActions: { alignItems: 'flex-end', justifyContent: 'center' },
-  statusBadge: { paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 },
-  statusBadgeText: { fontSize: 11, fontWeight: 'bold' },
-
-  /* Acciones Swipe */
-  swipeActionsContainer: {
+  safeArea: { flex: 1 },
+  container: { flex: 1, paddingHorizontal: 16, paddingTop: 12 },
+  headerContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  userInfo: { flex: 1, alignItems: 'center' },
+  userName: { fontSize: 22, fontWeight: 'bold' },
+  userEmail: { fontSize: 14, marginTop: 2 },
+  settingsButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  settingsIcon: { fontSize: 20 },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  statCard: {
+    flex: 0.48,
+    paddingVertical: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  statNumber: { fontSize: 24, fontWeight: 'bold' },
+  statLabel: { fontSize: 13, marginTop: 4 },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
     marginBottom: 10,
   },
-  cancelSwipeAction: {
-    backgroundColor: '#9b04ff98',
+  sectionTitle: { fontSize: 18, fontWeight: 'bold' },
+  sectionSubtitle: { fontSize: 12, fontStyle: 'italic' },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 12,
+  },
+  searchIcon: { marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 14 },
+  filterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  filterChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterText: { fontSize: 12, fontWeight: '600' },
+  listContent: { paddingBottom: 16 },
+  ticketCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderLeftWidth: 5,
+    marginBottom: 10,
+  },
+  ticketMainInfo: { flex: 1 },
+  ticketTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
+  ticketDate: { fontSize: 13 },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusIcon: { fontSize: 10, marginRight: 4 },
+  statusText: { fontSize: 12, fontWeight: 'bold' },
+
+  // Estilos para los botones del Swipe
+  swipeActionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    marginLeft: 8,
+  },
+  swipeActionBtn: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 85,
-    borderTopLeftRadius: 10,
-    borderBottomLeftRadius: 10,
+    paddingHorizontal: 12,
+    height: '100%',
+    borderRadius: 12,
+    marginLeft: 4,
   },
-  deleteSwipeAction: {
+  cancelActionBtn: {
+    backgroundColor: '#F97316',
+  },
+  deleteActionBtn: {
     backgroundColor: '#EF4444',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 85,
-    borderTopRightRadius: 10,
-    borderBottomRightRadius: 10,
-  },
-  deleteSwipeActionSingle: {
-    borderRadius: 10, // Bordes curvos completos cuando Eliminar es el único botón visible
   },
   swipeActionText: {
-    color: '#FFF',
+    color: '#FFFFFF',
     fontWeight: 'bold',
-    fontSize: 11,
+    fontSize: 12,
   },
 
-  emptyContainer: { padding: 25, borderRadius: 10, alignItems: 'center', marginTop: 5 },
-  emptyText: { fontSize: 14, fontWeight: '500' },
-  logoutButton: { borderWidth: 1, paddingVertical: 14, borderRadius: 10, alignItems: 'center', marginTop: 10 },
-  logoutText: { fontSize: 16, fontWeight: 'bold' },
-  pillButton: { position: 'absolute', bottom: 20, right: 20, height: 46, paddingHorizontal: 6, paddingRight: 14, borderRadius: 23, flexDirection: 'row', alignItems: 'center', borderWidth: 1, elevation: 6, zIndex: 999 },
-  pillIconBadge: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
-  pillIcon: { fontSize: 16 },
-  pillText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.8, marginLeft: 10 },
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { width: '100%', borderRadius: 16, padding: 24, alignItems: 'center', elevation: 10 },
-  modalHeaderTitle: { fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase' },
-  modalEventTitle: { fontSize: 20, fontWeight: 'bold', marginTop: 6, textAlign: 'center' },
-  modalAttendee: { fontSize: 14, marginTop: 2 },
-  qrContainer: { marginVertical: 20, padding: 12, backgroundColor: '#FFF', borderRadius: 12 },
-  qrImage: { width: 180, height: 180 },
-  ticketIdText: { fontSize: 13, fontWeight: 'bold', marginBottom: 15 },
-  closeModalButton: { width: '100%', paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
-  closeModalButtonText: { color: '#FFF', fontSize: 15, fontWeight: 'bold' },
+  emptyText: { textAlign: 'center', marginTop: 24, fontSize: 14 },
+  logoutButton: {
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginVertical: 12,
+  },
+  logoutText: { color: '#EF4444', fontWeight: 'bold', fontSize: 15 },
 });
