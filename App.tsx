@@ -2,7 +2,9 @@
 import React from 'react';
 import { StatusBar, StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Provider } from 'react-redux';
 
+import { store } from './src/store/store';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { TicketProvider } from './src/context/TicketContext';
 import { EventProvider } from './src/context/EventContext';
@@ -25,15 +27,17 @@ const MainApp = () => {
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={styles.container}>
-      <ThemeProvider>
-        <EventProvider>
-          <TicketProvider>
-            <MainApp />
-          </TicketProvider>
-        </EventProvider>
-      </ThemeProvider>
-    </GestureHandlerRootView>
+    <Provider store={store}>
+      <GestureHandlerRootView style={styles.container}>
+        <ThemeProvider>
+          <EventProvider>
+            <TicketProvider>
+              <MainApp />
+            </TicketProvider>
+          </EventProvider>
+        </ThemeProvider>
+      </GestureHandlerRootView>
+    </Provider>
   );
 }
 
