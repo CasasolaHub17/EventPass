@@ -1,4 +1,3 @@
-// src/screens/HomeScreen.tsx
 import React, { useState, useMemo } from 'react';
 import {
   View,
@@ -12,10 +11,12 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { useSelector } from 'react-redux';
+import { RootState } from '../store/store';
 import { MainTabParamList } from '../types/navigation';
 import { useTheme } from '../context/ThemeContext';
 import { useTickets } from '../context/TicketContext';
-import { useEvents, EventItem } from '../context/EventContext';
+import { useEvents } from '../context/EventContext';
 
 type NavigationProp = BottomTabNavigationProp<MainTabParamList, 'Home'>;
 
@@ -23,7 +24,13 @@ export const HomeScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const { colors } = useTheme();
   const { tickets, addTicket } = useTickets();
-  const { events } = useEvents();
+
+  // 1. Obtención de eventos desde Redux (Cumpliendo Rúbrica)
+  const reduxEvents = useSelector((state: RootState) => state.events.eventsList);
+  
+  // Respaldos por compatibilidad con EventContext si fuera necesario
+  const contextEvents = useEvents ? useEvents().events : [];
+  const events = reduxEvents.length > 0 ? reduxEvents : contextEvents;
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -41,7 +48,7 @@ export const HomeScreen = () => {
     );
   };
 
-  const handleRegister = (event: EventItem) => {
+  const handleRegister = (event: any) => {
     if (isUserRegistered(event.id, event.title)) {
       Alert.alert('Registro Duplicado', 'Ya posees un pase activo para este evento.');
       return;
@@ -67,7 +74,7 @@ export const HomeScreen = () => {
     );
   };
 
-  const renderEventItem = ({ item }: { item: EventItem }) => {
+  const renderEventItem = ({ item }: { item: any }) => {
     const registered = isUserRegistered(item.id, item.title);
 
     return (
@@ -77,7 +84,7 @@ export const HomeScreen = () => {
             {item.category}
           </Text>
           <Text style={[styles.eventDate, { color: colors.textSecondary }]}>
-            📅 {item.displayDate}
+            📅 {item.displayDate || item.date}
           </Text>
         </View>
 
